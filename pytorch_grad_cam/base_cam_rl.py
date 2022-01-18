@@ -68,7 +68,7 @@ class BaseCAMRL:
             cam = weighted_activations.sum(axis=1)
         return cam
 
-    def forward(self, input_tensor, alpha, target_category=None, eigen_smooth=False):
+    def forward(self, input_tensor, alpha, target_category=None, eigen_smooth=False, hybrid_state=None):
         #if type(obs) is np.ndarray:
         #    obs = torch.from_numpy(obs).to(self.device)
 
@@ -76,7 +76,13 @@ class BaseCAMRL:
             input_tensor = torch.autograd.Variable(input_tensor,
                                                    requires_grad=True)
 
-        _ , pi, log_pi, log_std = self.activations_and_grads(input_tensor)
+        if not hybrid_state is None:
+            inp = [input_tensor, hybrid_state]
+        else:
+            inp = input_tensor
+
+        #_ , pi, log_pi, log_std = self.activations_and_grads(input_tensor, hybrid_state)
+        _ , pi, log_pi, log_std = self.activations_and_grads(inp)
         #if isinstance(target_category, int):
         #    target_category = [target_category] * input_tensor.size(0)
 
@@ -87,7 +93,7 @@ class BaseCAMRL:
 
         if self.uses_gradients:
             self.actor.zero_grad()
-            loss = self.get_loss(pi, log_pi, input_tensor, alpha)
+            loss = self.get_loss(pi, log_pi, inp, alpha)
             loss.backward(retain_graph=True)
 
         # In most of the saliency attribution papers, the saliency is
@@ -188,15 +194,15 @@ class BaseCAMRL:
                  alpha,
                  target_category=None,
                  aug_smooth=False,
-                 eigen_smooth=False):
-
+                 eigen_smooth=False,
+                 hybrid_state=None):
         # Smooth the CAM result with test time augmentation
         if aug_smooth is True:
             return self.forward_augmentation_smoothing(
                 input_tensor, target_category, eigen_smooth)
 
         return self.forward(input_tensor, alpha,
-                            target_category, eigen_smooth)
+                            target_category, eigen_smooth, hybrid_state=hybrid_state)
 
     def __del__(self):
         self.activations_and_grads.release()
